@@ -1399,7 +1399,8 @@ function buildZeroTwoPlanFromOpenAI(openaiReq, account, requestMeta, threadId) {
         userId: account.userId || account.id,
         ...(threadId ? { threadId } : {}),
         requestId: randomId("req"),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        ...(account?.isPro ? { plan: "pro" } : {})
       }
     }
   };
