@@ -1033,6 +1033,14 @@ class TokenStore {
 }
 
 const store = new TokenStore(CONFIG.accountsFile);
+const runtimeFlags = {
+  // 临时开关：开启后按 Pro 能力挑选账号，但不改动账号持久化层级。
+  pseudoProEnabled: false
+};
+
+function isAccountProCapable(account) {
+  return Boolean(account?.isPro) || runtimeFlags.pseudoProEnabled === true;
+}
 
 function classifyAuthFailure(status) {
   return status === 401 || status === 403;
@@ -1263,7 +1271,7 @@ function pickAccount({ requiredPro } = {}) {
   for (const a of store.accounts.values()) {
     const rt = store.runtimeState(a.id);
     if (a.disabled) continue;
-    if (requiredPro && !a.isPro) continue;
+    if (requiredPro && !isAccountProCapable(a)) continue;
     if (rt.circuitUntilMs && rt.circuitUntilMs > now) continue;
     const maxInflight = Number(a.maxInflight || 0) || CONFIG.defaultMaxInflightPerAccount;
     if (rt.inflight >= maxInflight) continue;
@@ -1400,7 +1408,7 @@ function buildZeroTwoPlanFromOpenAI(openaiReq, account, requestMeta, threadId) {
         ...(threadId ? { threadId } : {}),
         requestId: randomId("req"),
         timestamp: new Date().toISOString(),
-        ...(account?.isPro ? { plan: "pro" } : {})
+        ...(isAccountProCapable(account) ? { plan: "pro" } : {})
       }
     }
   };
@@ -1840,7 +1848,18 @@ async function handleAdminApi(req, res, url) {
   if (!requireApiKey(req)) return sendJson(res, 401, { error: { message: "缺少或错误的 API Key" } });
 
   if (req.method === "GET" && url.pathname === "/admin/api/accounts") {
-    return sendJson(res, 200, { accounts: store.list() });
+    return sendJson(res, 200, { accounts: store.list(), pseudoProEnabled: runtimeFlags.pseudoProEnabled === true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/admin/api/runtime/pseudo-pro") {
+    const body = await readBody(req);
+    const parsed = safeJsonParse(body.toString("utf8"));
+    if (!parsed.ok) return sendJson(res, 400, { error: { message: "JSON 解析失败" } });
+    if (typeof parsed.value?.enabled !== "boolean") {
+      return sendJson(res, 400, { error: { message: "enabled 必须是布尔值" } });
+    }
+    runtimeFlags.pseudoProEnabled = parsed.value.enabled === true;
+    return sendJson(res, 200, { ok: true, pseudoProEnabled: runtimeFlags.pseudoProEnabled === true });
   }
 
   if (req.method === "POST" && url.pathname === "/admin/api/accounts/refresh-profile-settings") {

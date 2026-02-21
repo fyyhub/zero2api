@@ -5,6 +5,7 @@ const isProEl = document.getElementById("isPro");
 const countEl = document.getElementById("accountCount");
 const proCountEl = document.getElementById("proCount");
 const refreshProfileSettingsEl = document.getElementById("refreshProfileSettings");
+const pseudoProSwitchEl = document.getElementById("pseudoProSwitch");
 const tbody = document.getElementById("tbody");
 const toastEl = document.getElementById("toast");
 const toastTitleEl = document.getElementById("toastTitle");
@@ -95,6 +96,28 @@ refreshProfileSettingsEl?.addEventListener("click", async () => {
     showToast({ title: "刷新模型失败", message: e.message });
   } finally {
     refreshProfileSettingsEl.disabled = false;
+  }
+});
+
+pseudoProSwitchEl?.addEventListener("change", async () => {
+  const nextEnabled = pseudoProSwitchEl.checked === true;
+  pseudoProSwitchEl.disabled = true;
+  setStatus(`正在${nextEnabled ? "开启" : "关闭"}伪 Pro...`, "");
+  try {
+    const data = await api("/admin/api/runtime/pseudo-pro", {
+      method: "POST",
+      body: JSON.stringify({ enabled: nextEnabled })
+    });
+    const enabled = data?.pseudoProEnabled === true;
+    pseudoProSwitchEl.checked = enabled;
+    setStatus(`伪 Pro 已${enabled ? "开启" : "关闭"}。`, "ok");
+    await load();
+  } catch (e) {
+    pseudoProSwitchEl.checked = !nextEnabled;
+    setStatus(`伪 Pro 切换失败：${e.message}`, "error");
+    showToast({ title: "伪 Pro 切换失败", message: e.message });
+  } finally {
+    pseudoProSwitchEl.disabled = false;
   }
 });
 
@@ -502,6 +525,7 @@ async function load() {
   try {
     const data = await api("/admin/api/accounts", { method: "GET" });
     const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    if (pseudoProSwitchEl) pseudoProSwitchEl.checked = data?.pseudoProEnabled === true;
     const proCount = accounts.filter((a) => a.isPro).length;
     countEl.textContent = String(accounts.length);
     proCountEl.textContent = String(proCount);

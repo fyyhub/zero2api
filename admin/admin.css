@@ -319,6 +319,13 @@ select:focus {
   box-shadow: 0 0 0 3px var(--accent-light);
 }
 
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+}
+
 textarea {
   min-height: 120px;
   resize: vertical;
